@@ -31,10 +31,10 @@ for scheduler in schedulers:
     for file in data:
         # Run the template scheduler
         if scheduler == "template":
-            os.system("python Schedulers/template.py " + file)
+            os.system("python3 Schedulers/template.py " + file)
 
         # Run the marker on the schedulers
-        out = scheduler + '-' + file + '-' + os.popen("python marker.py " + file + " " + scheduler).read().strip()
+        out = scheduler + '-' + file + '-' + os.popen("python3 marker.py " + file + " " + scheduler).read().strip()
         out_data = out.split('-')
 
         # Check if the scheduler is correct
