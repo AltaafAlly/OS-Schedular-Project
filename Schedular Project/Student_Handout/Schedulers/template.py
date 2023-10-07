@@ -12,39 +12,58 @@ class Process:
         self.arrival_time = arrival_time
         self.io_frequency = io_frequency
 
-#FCFS Scheduler
+
+#FCFS Scheduler first one
+#WORKING FCFS
 def fcfs_scheduler(process_list):
     # sort the processes based on their arrival time
     process_list.sort(key=lambda x: x.arrival_time)
-
-    # variable to track the current time
-    current_time = 0
 
     # variable to store the scheduled tasks in order
     schedule_order = ""
 
     for process in process_list:
-        # if a process arrives after the current time, just move the time forward
-        if process.arrival_time > current_time:
-            current_time = process.arrival_time
+        # counter to keep track of time units since the last I/O for this process
+        time_since_last_io = 0
 
         # schedule the process and handle I/O
         while process.duration > 0:
             # check if we need to schedule I/O
-            if process.io_frequency and process.duration % process.io_frequency == 0:
+            if process.io_frequency and time_since_last_io == process.io_frequency:
                 schedule_order += f"!{process.name} "
-                process.duration -= 1
+                time_since_last_io = 0  # reset the counter
             else:
                 schedule_order += f"{process.name} "
                 process.duration -= 1
-
-            current_time += 1
+                time_since_last_io += 1
 
     return schedule_order.strip()
 
-#STCF Scheduler
+# #FCFS scheduler second one optomized
+# def fcfs_scheduler(process_list):
+#     # Sort the processes based on their I/O frequency (ascending order)
+#     process_list.sort(key=lambda x: x.io_frequency)
 
-def stcf_scheduler(process_list):
+#     # Use a list comprehension to generate the schedule order
+#     schedule_order = []
+
+#     for process in process_list:
+#         for i in range(process.duration):
+#             io_event = ''
+#             if process.io_frequency > 0 and i % process.io_frequency == 0:
+#                 io_event = f" !{process.name}"
+#             schedule_order.append(f"{process.name}{io_event}")
+
+#     return ' '.join(schedule_order).strip()
+
+
+
+
+
+#STCF Scheduler
+#WORKING STCF
+
+def stcf_scheduler(process_list, num_processors):
     # sort the processes based on their arrival time for initial processing
     process_list.sort(key=lambda x: x.arrival_time)
 
@@ -53,6 +72,8 @@ def stcf_scheduler(process_list):
 
     # this will hold processes that have arrived but haven't finished executing
     ready_queue = []
+    # Initialize a dictionary to track the time since the last I/O for each process
+    time_since_last_io = {}
 
     while process_list or ready_queue:
         # add processes to the ready queue that have arrived
@@ -60,29 +81,48 @@ def stcf_scheduler(process_list):
             ready_queue.append(process_list.pop(0))
 
         if not ready_queue:  # if there's no process in the ready queue, just move time forward
-            current_time = process_list[0].arrival_time
+            current_time += 1
             continue
 
         # select the process with the shortest duration left
         process = min(ready_queue, key=lambda x: x.duration)
         ready_queue.remove(process)
 
-        # check if we need to schedule I/O
-        if process.io_frequency and process.duration % process.io_frequency == 0:
-            schedule_order += f"!{process.name} "
-            current_time += 1
+        # Check if it's time for I/O for the current process
+        if process.io_frequency:
+            if process.name not in time_since_last_io:
+                time_since_last_io[process.name] = 0
+
+            if time_since_last_io[process.name] == process.io_frequency:
+                schedule_order += f"!{process.name} "
+                time_since_last_io[process.name] = 0  # Reset the counter
+            else:
+                schedule_order += f"{process.name} "
+                process.duration -= 1
+                time_since_last_io[process.name] += 1
         else:
             schedule_order += f"{process.name} "
             process.duration -= 1
-            current_time += 1
 
-        # if the process has not finished executing, return it to the ready queue
+
+        # Update the number of processors and print the current status
+        #print(f"Time: {current_time}, Running: {process.name}, Processors: {num_processors}, Ready Queue: {', '.join([p.name for p in ready_queue])}")
+
+        #process.duration -= 1
+        current_time += 1
+
+        # Check if the process has completed
         if process.duration > 0:
             ready_queue.append(process)
+        
+
 
     return schedule_order.strip()
 
+
+
 #MLFQ Scheduler
+#NOT WORKING MLFQ
 
 def mlfq_scheduler(process_list):
     process_list.sort(key=lambda x: x.arrival_time)
@@ -109,8 +149,12 @@ def mlfq_scheduler(process_list):
             process = ready_queue_1.pop(0)
             time_spent = 0
             while time_spent < quantum_1 and process.duration > 0:
-                if process.io_frequency and process.duration % process.io_frequency == 0:
+                if process.io_frequency and (time_spent + 1) % process.io_frequency == 0:
                     schedule_order += f"!{process.name} "
+                    time_spent += 1
+                    current_time += 1
+                    if process.duration > 0:
+                        ready_queue_1.insert(0, process)  # Put it back to the front of queue 1
                     break
                 else:
                     schedule_order += f"{process.name} "
@@ -118,19 +162,21 @@ def mlfq_scheduler(process_list):
                     time_spent += 1
                     current_time += 1
 
-            if process.duration > 0:
-                if time_spent == quantum_1:
-                    ready_queue_2.append(process)
-                else:
-                    ready_queue_1.append(process)
+            # if quantum is exhausted and process still has duration, move to queue 2
+            if time_spent == quantum_1 and process.duration > 0:
+                ready_queue_2.append(process)
 
         # Then serve processes in ready_queue_2 if ready_queue_1 is empty
         elif ready_queue_2:
             process = ready_queue_2.pop(0)
             time_spent = 0
             while time_spent < quantum_2 and process.duration > 0:
-                if process.io_frequency and process.duration % process.io_frequency == 0:
+                if process.io_frequency and (time_spent + 1) % process.io_frequency == 0:
                     schedule_order += f"!{process.name} "
+                    time_spent += 1
+                    current_time += 1
+                    if process.duration > 0:
+                        ready_queue_1.append(process)  # Moving back up to queue 1 after I/O 
                     break
                 else:
                     schedule_order += f"{process.name} "
@@ -138,7 +184,8 @@ def mlfq_scheduler(process_list):
                     time_spent += 1
                     current_time += 1
 
-            if process.duration > 0:
+            # if quantum is exhausted and process still has duration, place back in queue 2
+            if time_spent == quantum_2 and process.duration > 0:
                 ready_queue_2.append(process)
 
     return schedule_order.strip()
@@ -164,7 +211,7 @@ def main():
         with open(input_file_name, "r") as file:
             # Read the number of processes from the file
             num_processes = int(file.readline().strip())
-            print(f"Number of processes: {num_processes}")
+
             # Read process data from the file and populate the data_set list
             for _ in range(num_processes):
                 line = file.readline().strip()
@@ -172,43 +219,10 @@ def main():
                 process = Process(name, int(duration), int(arrival_time), int(io_frequency))
                 data_set.append(process)
 
-            # Check if the expected number of processes matches the filename
-            # expected_num_processes = int(sys.argv[1].split('_')[1].split('.')[0]) # Extracting '9' from 'data_9.txt'
-            # if expected_num_processes != num_processes:
-            #     print(f"Expected {expected_num_processes} processes but got {num_processes} processes")
-            #     return 1
-
     except FileNotFoundError:
         print("Error opening the file.")
         return 1
 
-    # Call the FCFS scheduler function to generate the output
-    # decide which scheduler to use
-    scheduler_type = sys.argv[1].split('_')[0]
-
-    if scheduler_type == "fcfs":
-                output = fcfs_scheduler(data_set)
-    elif scheduler_type == "stcf":
-        output = stcf_scheduler(data_set)
-    elif scheduler_type == "mlfq":
-        output = mlfq_scheduler(data_set)
-    else:
-        print("Invalid scheduler name")
-
-    
-
-    # Open a file for writing
-    try:
-        #output = fcfs_scheduler(data_set)
-        output_path = f"Schedulers/template/{config['dataset']}/template_out_{sys.argv[1].split('_')[1]}"
-        with open(output_path, "w") as output_file:
-            # Write the final result to the output file
-            output_file.write(output)
-    except IOError:
-        print("Error opening the output file.")
-        return 1
-
-    return 0
 
     """
     TODO Your Algorithm - assign your output to the output variable
@@ -216,11 +230,27 @@ def main():
 
 
     #output = "AB AC AB !AD BA CB !BL BX AB" #Example output
-
+    #output = fcfs_scheduler(data_set)
+    output = stcf_scheduler(data_set,num_processes)
+    #output = mlfq_scheduler(data_set)
 
     """
     End of your algorithm
     """
+
+    
+
+    # Open a file for writing
+    try:
+        output_path = f"Schedulers/template/{config['dataset']}/template_out_{sys.argv[1].split('_')[1]}"
+        with open(output_path, "w") as output_file:
+            # Write the final result to the output file
+            output_file.write(output)
+
+    except IOError:
+        print("Error opening the output file.")
+        return 1
+
     return 0
 
 if __name__ == "__main__":

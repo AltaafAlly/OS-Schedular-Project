@@ -1,1 +1,1 @@
-Small data_9.txt template Expected 1328 processes but got 0 processes
+Small data_9.txt template Expected 2 IO occurances for process AF but                      got 0
