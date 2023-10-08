@@ -63,7 +63,7 @@ def fcfs_scheduler(process_list):
 #STCF Scheduler
 #WORKING STCF
 
-def stcf_scheduler(process_list, num_processors):
+def stcf_scheduler(process_list):
     # sort the processes based on their arrival time for initial processing
     process_list.sort(key=lambda x: x.arrival_time)
 
@@ -104,11 +104,6 @@ def stcf_scheduler(process_list, num_processors):
             schedule_order += f"{process.name} "
             process.duration -= 1
 
-
-        # Update the number of processors and print the current status
-        #print(f"Time: {current_time}, Running: {process.name}, Processors: {num_processors}, Ready Queue: {', '.join([p.name for p in ready_queue])}")
-
-        #process.duration -= 1
         current_time += 1
 
         # Check if the process has completed
@@ -124,71 +119,120 @@ def stcf_scheduler(process_list, num_processors):
 #MLFQ Scheduler
 #NOT WORKING MLFQ
 
+# def mlfq_scheduler(process_list):
+#     process_list.sort(key=lambda x: x.arrival_time)
+
+#     current_time = 0
+#     schedule_order = ""
+
+#     ready_queue_1 = []  # for I/O-bound processes (shorter quantum)
+#     ready_queue_2 = []  # for CPU-bound processes (longer quantum)
+
+#     quantum_1 = 2
+#     quantum_2 = 8
+
+#     while process_list or ready_queue_1 or ready_queue_2:
+#         while process_list and process_list[0].arrival_time <= current_time:
+#             ready_queue_1.append(process_list.pop(0))
+
+#         if not ready_queue_1 and not ready_queue_2:
+#             current_time = process_list[0].arrival_time
+#             continue
+
+#         # First serve processes in ready_queue_1
+#         if ready_queue_1:
+#             process = ready_queue_1.pop(0)
+#             time_spent = 0
+#             while time_spent < quantum_1 and process.duration > 0:
+#                 if process.io_frequency and time_spent > 0 and time_spent % process.io_frequency == 0:
+#                     schedule_order += f"!{process.name} "
+#                     process.duration -= 1  # Process an I/O operation
+#                 else:
+#                     schedule_order += f"{process.name} "
+#                     process.duration -= 1
+#                 time_spent += 1
+#                 current_time += 1
+
+#             # if the process still has duration, move to queue 2
+#             if process.duration > 0:
+#                 ready_queue_2.append(process)
+
+#         # Then serve processes in ready_queue_2 if ready_queue_1 is empty
+#         elif ready_queue_2:
+#             process = ready_queue_2.pop(0)
+#             time_spent = 0
+#             while time_spent < quantum_2 and process.duration > 0:
+#                 if process.io_frequency and time_spent > 0 and time_spent % process.io_frequency == 0:
+#                     schedule_order += f"!{process.name} "
+#                     process.duration -= 1  # Process an I/O operation
+#                 else:
+#                     schedule_order += f"{process.name} "
+#                     process.duration -= 1
+#                 time_spent += 1
+#                 current_time += 1
+
+#             # place back in queue 2 if the quantum is exhausted
+#             if process.duration > 0:
+#                 ready_queue_2.append(process)
+
+#     return schedule_order.strip()
+
 def mlfq_scheduler(process_list):
     process_list.sort(key=lambda x: x.arrival_time)
 
     current_time = 0
     schedule_order = ""
 
-    ready_queue_1 = []  # for I/O bound processes (shorter quantum)
-    ready_queue_2 = []  # for CPU bound processes (longer quantum)
+    ready_queue_1 = []  # High priority (shortest quantum)
+    ready_queue_2 = []  # Medium priority
+    ready_queue_3 = []  # Low priority (longest quantum)
 
     quantum_1 = 2
     quantum_2 = 4
+    quantum_3 = 8
 
-    while process_list or ready_queue_1 or ready_queue_2:
+    while process_list or ready_queue_1 or ready_queue_2 or ready_queue_3:
         while process_list and process_list[0].arrival_time <= current_time:
             ready_queue_1.append(process_list.pop(0))
 
-        if not ready_queue_1 and not ready_queue_2:
+        if not ready_queue_1 and not ready_queue_2 and not ready_queue_3:
             current_time = process_list[0].arrival_time
             continue
 
         # First serve processes in ready_queue_1
         if ready_queue_1:
             process = ready_queue_1.pop(0)
-            time_spent = 0
-            while time_spent < quantum_1 and process.duration > 0:
-                if process.io_frequency and (time_spent + 1) % process.io_frequency == 0:
-                    schedule_order += f"!{process.name} "
-                    time_spent += 1
-                    current_time += 1
-                    if process.duration > 0:
-                        ready_queue_1.insert(0, process)  # Put it back to the front of queue 1
-                    break
-                else:
-                    schedule_order += f"{process.name} "
-                    process.duration -= 1
-                    time_spent += 1
-                    current_time += 1
-
-            # if quantum is exhausted and process still has duration, move to queue 2
-            if time_spent == quantum_1 and process.duration > 0:
-                ready_queue_2.append(process)
+            execute_process(process, quantum_1, schedule_order, current_time, ready_queue_2)
 
         # Then serve processes in ready_queue_2 if ready_queue_1 is empty
         elif ready_queue_2:
             process = ready_queue_2.pop(0)
-            time_spent = 0
-            while time_spent < quantum_2 and process.duration > 0:
-                if process.io_frequency and (time_spent + 1) % process.io_frequency == 0:
-                    schedule_order += f"!{process.name} "
-                    time_spent += 1
-                    current_time += 1
-                    if process.duration > 0:
-                        ready_queue_1.append(process)  # Moving back up to queue 1 after I/O 
-                    break
-                else:
-                    schedule_order += f"{process.name} "
-                    process.duration -= 1
-                    time_spent += 1
-                    current_time += 1
+            execute_process(process, quantum_2, schedule_order, current_time, ready_queue_3)
 
-            # if quantum is exhausted and process still has duration, place back in queue 2
-            if time_spent == quantum_2 and process.duration > 0:
-                ready_queue_2.append(process)
+        # Lastly, serve processes in ready_queue_3 if ready_queue_1 and ready_queue_2 are empty
+        elif ready_queue_3:
+            process = ready_queue_3.pop(0)
+            execute_process(process, quantum_3, schedule_order, current_time, ready_queue_3)  # Put it back to ready_queue_3 if not finished
 
     return schedule_order.strip()
+
+def execute_process(process, quantum, schedule_order, current_time, next_queue):
+    time_spent = 0
+    while time_spent < quantum and process.duration > 0:
+        if process.io_frequency and time_spent > 0 and time_spent % process.io_frequency == 0:
+            schedule_order += f"!{process.name} "
+            process.duration -= 1  # Process an I/O operation
+        else:
+            schedule_order += f"{process.name} "
+            process.duration -= 1
+        time_spent += 1
+        current_time += 1
+
+    # if the process still has duration, move to next queue
+    if process.duration > 0:
+        next_queue.append(process)
+
+
 
 
 def main():
@@ -231,8 +275,8 @@ def main():
 
     #output = "AB AC AB !AD BA CB !BL BX AB" #Example output
     #output = fcfs_scheduler(data_set)
-    output = stcf_scheduler(data_set,num_processes)
-    #output = mlfq_scheduler(data_set)
+    #output = stcf_scheduler(data_set)
+    output = mlfq_scheduler(data_set)
 
     """
     End of your algorithm
