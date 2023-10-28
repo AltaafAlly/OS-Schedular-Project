@@ -275,8 +275,8 @@ def main():
 
     #output = "AB AC AB !AD BA CB !BL BX AB" #Example output
     #output = fcfs_scheduler(data_set)
-    #output = stcf_scheduler(data_set)
-    output = mlfq_scheduler(data_set)
+    output = stcf_scheduler(data_set)
+    #output = mlfq_scheduler(data_set)
 
     """
     End of your algorithm
